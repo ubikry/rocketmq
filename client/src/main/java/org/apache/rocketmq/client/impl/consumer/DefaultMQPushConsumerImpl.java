@@ -299,6 +299,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         final long beginTimestamp = System.currentTimeMillis();
 
         PullCallback pullCallback = new PullCallback() {
+            /**
+             * 当 pull 成功时
+             * @param pullResult
+             */
             @Override
             public void onSuccess(PullResult pullResult) {
                 if (pullResult != null) {
@@ -566,7 +570,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
     public synchronized void start() throws MQClientException {
         switch (this.serviceState) {
-            case CREATE_JUST:
+            case CREATE_JUST: // 刚启动
                 log.info("the consumer [{}] start beginning. messageModel={}, isUnitMode={}", this.defaultMQPushConsumer.getConsumerGroup(),
                     this.defaultMQPushConsumer.getMessageModel(), this.defaultMQPushConsumer.isUnitMode());
                 this.serviceState = ServiceState.START_FAILED;

@@ -20,7 +20,14 @@ import java.util.List;
 import org.apache.rocketmq.common.message.MessageExt;
 
 public class PullResult {
+
+    /**
+     * pull 的结果
+     */
     private final PullStatus pullStatus;
+    /**
+     * 下一次开始的偏移量
+     */
     private final long nextBeginOffset;
     private final long minOffset;
     private final long maxOffset;

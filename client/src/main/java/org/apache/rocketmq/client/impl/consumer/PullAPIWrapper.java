@@ -54,6 +54,9 @@ public class PullAPIWrapper {
     private final MQClientInstance mQClientFactory;
     private final String consumerGroup;
     private final boolean unitMode;
+    /**
+     * 记录队列消费的是哪个节点
+     */
     private ConcurrentMap<MessageQueue, AtomicLong/* brokerId */> pullFromWhichNodeTable =
         new ConcurrentHashMap<MessageQueue, AtomicLong>(32);
     private volatile boolean connectBrokerByUser = false;
@@ -67,16 +70,31 @@ public class PullAPIWrapper {
         this.unitMode = unitMode;
     }
 
+    /**
+     * 处理 pull 回来的消息
+     * @param mq 消息队列
+     * @param pullResult pull 到的数据
+     * @param subscriptionData 订阅者信息
+     * @return
+     */
     public PullResult processPullResult(final MessageQueue mq, final PullResult pullResult,
         final SubscriptionData subscriptionData) {
+        // 此处需要判断后强转
         PullResultExt pullResultExt = (PullResultExt) pullResult;
 
+        // 更新是从哪个节点 pull 的？
         this.updatePullFromWhichNode(mq, pullResultExt.getSuggestWhichBrokerId());
+
+        //如果 pull 到消息
         if (PullStatus.FOUND == pullResult.getPullStatus()) {
+
+            // 1. 处理消息
             ByteBuffer byteBuffer = ByteBuffer.wrap(pullResultExt.getMessageBinary());
             List<MessageExt> msgList = MessageDecoder.decodes(byteBuffer);
 
+            // 2. 消息过滤
             List<MessageExt> msgListFilterAgain = msgList;
+            // 当订阅数据的标签不为空(因为服务端 query 只存储了 tag 的 hash 值，有可能存在 hash 冲突的情况) 且 订阅的模式不是 ClassFilter Mode （TODO 这是啥模式）
             if (!subscriptionData.getTagsSet().isEmpty() && !subscriptionData.isClassFilterMode()) {
                 msgListFilterAgain = new ArrayList<MessageExt>(msgList.size());
                 for (MessageExt msg : msgList) {
@@ -115,8 +133,19 @@ public class PullAPIWrapper {
         return pullResult;
     }
 
+    /**
+     * 更新 pull 最新的队列节点
+     * @param mq 消息队列
+     * @param brokerId
+     */
     public void updatePullFromWhichNode(final MessageQueue mq, final long brokerId) {
+
+        // 获取此队列的节点
         AtomicLong suggest = this.pullFromWhichNodeTable.get(mq);
+        /**
+         * 为什么下边这样写法？
+         * 1. 保证原子的可见性。
+         */
         if (null == suggest) {
             this.pullFromWhichNodeTable.put(mq, new AtomicLong(brokerId));
         } else {
